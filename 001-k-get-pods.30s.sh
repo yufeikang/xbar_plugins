@@ -45,7 +45,7 @@ if [ $ns == $current_namespace ];
 then
     echo $ns
 else
-    echo "$ns | shell=kubectl | ${switch_ns}${ns} | refresh=true "
+    echo "$ns | shell=kubectl | ${switch_ns}${ns} | refresh=true |terminal=true"
 fi
 done
 echo "==== PODS ===="

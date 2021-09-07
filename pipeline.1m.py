@@ -45,6 +45,8 @@ STOP_COLOR = "#FA9E41"
 FAILED_COLOR = "#CD4425"
 PEDING_COLOR = "#7E8BA7"
 
+PL_ICON = "iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAMAAADXqc3KAAABBVBMVEUAAAAAAABAQIAzZmZVVYBJSW1AYGA5VXFAUHBDUWtATXM9VW09UnBCVXFAUm1AUHBFU25DUWtBVW9AU2xEUXBBU3FET2xBUW1AUHBBUG5AU2xDUm9DUm5CUGxDUW9BU25DUW1BUW9DU25CUW5CUm5CU29DUm5CUm9CUW5BUm5DUW9CU25CU25CUW5DU29CUm5CUm1CUm9CU21CUm5CUm5CUm5CUW5CUm5CUm1CU25CUm5BUm5CUW5CUm5CUm5CUm5CUm1CU29CUm5CUW5CUm5CUm5CUm5CUm9CUm5CUm5CUm5CUm5CUm5CUm5CUm5CUm5CUm5CUm5CUm5CUm5CUm5CUm7////nnOMCAAAAVXRSTlMAAQQFBgcICRATFBUZGxwgJSYnKCkrLS8wMzQ1QUlMVlteX2FkbIKDhImKi46QkZKTlpqbnqepq6+ztbe8wMjKzdLX2Nzh6Onr7O3v8/T19vf4/P3+4pz2OgAAAAFiS0dEVgoN6YkAAADESURBVBgZpcHpNkJRAIbhN6Q6GRPKmDJHiYPImJTpaDrf/d+KpWXvtbb61/MwHr/CaOX+IkOWig/vgc75J1ru6Vd3EkfsXp3T7Rd1TyI4LvS6zHrraAa80ipWJvxO82dTjShGRUWMyKMKGHWtYeV0g9FREmteDYwvJbASamI8aQsrq2eMQ11iHesMYy4IU8BUDMi0wyxWvuqR3P+4hY2WfBw7bb3tFWrS3TSOkgaCgwlcC/3Pas3f9Rhy3ZtlpJWrOGP5ARNlHhIlNidlAAAAAElFTkSuQmCC"
+
 jst = timezone("Asia/Tokyo")
 
 
@@ -65,14 +67,22 @@ cloud = Cloud(
 
 STEP_COLOR_MAP = {
     "PENDING": PEDING_COLOR,
+    "NOT_RUN": PEDING_COLOR,
     "IN_PROGRESS": PROGRESS_COLOR,
     "COMPLETED": SUCCESS_COLOR,
+    "SUCCESSFUL": SUCCESS_COLOR,
 }
 
 # %%
 workspace = cloud.workspaces.get(WORKSPACE)
 
 data = []
+
+
+def get_status(state):
+    if "result" in state.keys():
+        return state["result"]["name"]
+    return state["name"]
 
 
 def iso_format(offset):
@@ -111,28 +121,24 @@ for repo in data:
     for pipeline in repo["pipelines"]:
         pipeline_url = f"https://bitbucket.org/{WORKSPACE}/{repo_name}/addon/pipelines/home#!/results/{pipeline.build_number}"
         steps = list(pipeline.steps())
-        current_step = steps[-1]
         target = pipeline.get_data("target")
         target_name = "-"
         if target["type"] == "pipeline_ref_target":
             target_name = target["ref_name"]
         elif target["type"] == "pipeline_pullrequest_target":
             target_name = target["source"]
-        for s in steps:
-            if s.state["name"] == "IN_PROGRESS":
-                current_step = s
-                break
         params = [
-            f"#{pipeline.build_number}[{target_name}]:({pipeline.build_seconds_used or '0'}s)-{current_step.state['name']}",
+            f"#{pipeline.build_number}[{target_name}]:({pipeline.build_seconds_used or '0'}s)-{get_status(pipeline.get_data('state'))}",
             f"href={pipeline_url}",
-            f"color={STEP_COLOR_MAP.get(current_step.state['name'], FAILED_COLOR)}",
+            f"templateImage={PL_ICON}",
+            f"color={STEP_COLOR_MAP.get(get_status(pipeline.get_data('state')), FAILED_COLOR)}",
         ]
         print("|".join(params))
         print(f"--created_on:{humanize_date(pipeline.created_on)}")
         for step in steps:
             step_params = [
-                f"--({step.state['name']}-{step.duration_in_seconds or 0}s)-{step.get_data('name')}",
-                f"color={STEP_COLOR_MAP.get(step.state['name'], FAILED_COLOR)} ",
+                f"--({get_status(step.state)}-{step.duration_in_seconds or 0}s)-{step.get_data('name')}",
+                f"color={STEP_COLOR_MAP.get(get_status(step.state), FAILED_COLOR)} ",
                 f"href={pipeline_url}",
             ]
             print("|".join(step_params))

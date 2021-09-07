@@ -11,3 +11,6 @@
 
 logs
 *.vars.json
+
+test.*
+.DS_Store
