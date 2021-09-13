@@ -45,7 +45,6 @@ STOP_COLOR = "#FA9E41"
 FAILED_COLOR = "#CD4425"
 PEDING_COLOR = "#7E8BA7"
 
-PL_ICON = "iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAMAAADXqc3KAAABBVBMVEUAAAAAAABAQIAzZmZVVYBJSW1AYGA5VXFAUHBDUWtATXM9VW09UnBCVXFAUm1AUHBFU25DUWtBVW9AU2xEUXBBU3FET2xBUW1AUHBBUG5AU2xDUm9DUm5CUGxDUW9BU25DUW1BUW9DU25CUW5CUm5CU29DUm5CUm9CUW5BUm5DUW9CU25CU25CUW5DU29CUm5CUm1CUm9CU21CUm5CUm5CUm5CUW5CUm5CUm1CU25CUm5BUm5CUW5CUm5CUm5CUm5CUm1CU29CUm5CUW5CUm5CUm5CUm5CUm9CUm5CUm5CUm5CUm5CUm5CUm5CUm5CUm5CUm5CUm5CUm5CUm5CUm5CUm7////nnOMCAAAAVXRSTlMAAQQFBgcICRATFBUZGxwgJSYnKCkrLS8wMzQ1QUlMVlteX2FkbIKDhImKi46QkZKTlpqbnqepq6+ztbe8wMjKzdLX2Nzh6Onr7O3v8/T19vf4/P3+4pz2OgAAAAFiS0dEVgoN6YkAAADESURBVBgZpcHpNkJRAIbhN6Q6GRPKmDJHiYPImJTpaDrf/d+KpWXvtbb61/MwHr/CaOX+IkOWig/vgc75J1ru6Vd3EkfsXp3T7Rd1TyI4LvS6zHrraAa80ipWJvxO82dTjShGRUWMyKMKGHWtYeV0g9FREmteDYwvJbASamI8aQsrq2eMQ11iHesMYy4IU8BUDMi0wyxWvuqR3P+4hY2WfBw7bb3tFWrS3TSOkgaCgwlcC/3Pas3f9Rhy3ZtlpJWrOGP5ARNlHhIlNidlAAAAAElFTkSuQmCC"
 
 jst = timezone("Asia/Tokyo")
 
@@ -103,7 +102,7 @@ for repo in workspace.repositories.each(
     last_pipelines = []
 
     for pipeline in repo.pipelines.each(sort="-created_on"):
-        if pipeline.created_on < now - timedelta(minutes=60):
+        if pipeline.created_on < now - timedelta(hours=2):
             break
         last_pipelines.append(pipeline)
         LOGGER.info("pipelines: %s, %s", pipeline.build_number, pipeline.created_on)
@@ -130,7 +129,6 @@ for repo in data:
         params = [
             f"#{pipeline.build_number}[{target_name}]:({pipeline.build_seconds_used or '0'}s)-{get_status(pipeline.get_data('state'))}",
             f"href={pipeline_url}",
-            f"templateImage={PL_ICON}",
             f"color={STEP_COLOR_MAP.get(get_status(pipeline.get_data('state')), FAILED_COLOR)}",
         ]
         print("|".join(params))
@@ -143,7 +141,9 @@ for repo in data:
             ]
             print("|".join(step_params))
             if step.state["name"] == "IN_PROGRESS":
-                log_text = step.log().decode("utf-8")
+                log_text = step.log() or ""
+                if isinstance(log_text, bytes):
+                    log_text = log_text.decode("utf-8")
                 for line in log_text.split("\n"):
                     sys.stdout.write("----" + line.replace("|", "｜") + "\n")
 # %%

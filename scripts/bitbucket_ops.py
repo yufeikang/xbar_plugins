@@ -14,7 +14,7 @@ from atlassian.bitbucket.cloud import Cloud
 log_file = Path(__file__).parent.parent / "logs/script.log"
 
 logging.basicConfig(stream=sys.stdout, encoding="utf-8", level=logging.INFO)
-LOGGER = logging.getLogger("create_pr")
+LOGGER = logging.getLogger("bitbucket script")
 
 LOGGER.info(sys.argv)
 
@@ -36,6 +36,14 @@ cloud = Cloud(
     password=PASSWORD,
     cloud=True,
 )
+
+
+def _get_reviews():
+    ids = os.environ.get("VAR_REVIEWERS")
+    if ids is None:
+        LOGGER.error("Missing Reviews ID (UUID)")
+        sys.exit(-1)
+    return [{"uuid": uuid} for uuid in ids.split(",")]
 
 
 def _create_branch(repo, name, parent):
@@ -73,12 +81,13 @@ def release_pr():
     _create_branch(
         params["repo_name"], branch_name, params.get("source_branch", "develop")
     )
-    repo.pullrequests.create(
+    pr = repo.pullrequests.create(
         title=f"Release/{now.strftime('%Y%m%d')}",
         source_branch=branch_name,
         destination_branch="master",
         close_source_branch=True,
     )
+    LOGGER.info("Release PullRequest Created, %s", pr.get_link("html"))
 
 
 def hotfix_pr():
@@ -86,12 +95,13 @@ def hotfix_pr():
     _create_branch(
         params["repo_name"], branch_name, params.get("source_branch", "develop")
     )
-    repo.pullrequests.create(
+    pr = repo.pullrequests.create(
         title=f"Hotfix/{now.strftime('%Y%m%d')}",
         source_branch=branch_name,
         destination_branch="master",
         close_source_branch=True,
     )
+    LOGGER.info("Hotfix PullRequest Created, %s", pr.get_link("html"))
 
 
 def merge_sandbox():
@@ -102,22 +112,51 @@ def merge_sandbox():
         close_source_branch=False,
     )
     pr.merge()
+    LOGGER.info("Merge Sandbox Success, %s", pr.get_link("html"))
 
 
 def develop_pr():
     pr = repo.pullrequests.create(
-        title=f"develop-{now.strftime('%Y%m%d')}",
+        title=params.get("source_branch", f"develop-{now.strftime('%Y%m%d')}"),
         source_branch=params.get("source_branch"),
         destination_branch="develop",
         close_source_branch=params.get("close_source_branch", False),
     )
     if params.get("merge", False):
         pr.merge()
+    LOGGER.info("Develop PullRequest Created, %s", pr.get_link("html"))
 
 
 def delete_branch():
     source_branch = params.get("source_branch")
     _delete_branch(params["repo_name"], source_branch)
+
+
+def merge_pr():
+    pr_id = params.get("pr_id")
+    pr = next(repo.pullrequests.each(q=f"id={pr_id}"))
+    pr.merge()
+    LOGGER.info("PullRequest Merge Success, %s", pr.get_link("html"))
+
+
+def decline_pr():
+    pr_id = params.get("pr_id")
+    pr = next(repo.pullrequests.each(q=f"id={pr_id}"))
+    pr.decline()
+    LOGGER.info("PullRequest Decline Success")
+
+
+def pr_add_review():
+    pr_id = params.get("pr_id")
+    pr = next(repo.pullrequests.each(q=f"id={pr_id}"))
+    pr.put(
+        None,
+        data={
+            "title": pr.title,
+            "reviewers": _get_reviews(),
+        },
+    )
+    LOGGER.info("PullRequest Review Add Success, %s", pr.get_link("html"))
 
 
 globals()[params["fun"]]()
